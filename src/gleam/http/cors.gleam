@@ -53,9 +53,11 @@ fn parse_config(
 fn parse_allowed_origins(l: List(String)) -> Result(AllowedOrigins, Nil) {
   case list.contains(l, allow_all_origins), l {
     True, _ -> Ok(AllowAll)
-    _, other -> {
+    _, origins -> {
       let origins_set =
-        set.from_list(other)
+        origins
+        |> list.map(string.lowercase)
+        |> set.from_list
         // `handler` relies on "" not being in the set, "" is not a valid origin anyway
         |> set.delete("")
       case set.size(origins_set) {
@@ -77,7 +79,10 @@ fn parse_allowed_methods(l: List(Method)) -> Result(AllowedMethods, Nil) {
 }
 
 fn parse_allowed_headers(l: List(String)) -> Result(AllowedHeaders, Nil) {
-  let headers_set = set.from_list(l)
+  let headers_set =
+    l
+    |> list.map(string.lowercase)
+    |> set.from_list
   case set.size(headers_set) {
     0 -> Error(Nil)
     _ -> Ok(headers_set)
@@ -147,7 +152,7 @@ fn handler(request: Request(a), config: Config) -> Response {
 fn is_origin_allowed(origin: String, allowed_origins: AllowedOrigins) -> Bool {
   case allowed_origins {
     AllowAll -> True
-    AllowSome(origins) -> set.contains(origins, origin)
+    AllowSome(origins) -> set.contains(origins, string.lowercase(origin))
   }
 }
 
@@ -161,7 +166,7 @@ fn are_headers_allowed(
 ) -> Bool {
   list.all(
     request_headers,
-    fn(header) { set.contains(allowed_headers, header) },
+    fn(header) { set.contains(allowed_headers, string.lowercase(header)) },
   )
 }
 
