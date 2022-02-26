@@ -9,9 +9,14 @@ import gleam/list
 import gleam/set.{Set}
 import gleam/io
 import gleam/function
+import gleam/string
 
 type Config {
-  Config(allowed_origins: AllowedOrigins, allowed_methods: AllowedMethods)
+  Config(
+    allowed_origins: AllowedOrigins,
+    allowed_methods: AllowedMethods,
+    allowed_headers: AllowedHeaders,
+  )
 }
 
 type AllowedOrigins {
@@ -22,17 +27,26 @@ type AllowedOrigins {
 type AllowedMethods =
   Set(Method)
 
+type AllowedHeaders =
+  Set(String)
+
 const allow_origin_header = "Access-Control-Allow-Origin"
 
 const allow_all_origins = "*"
 
+const request_headers_header = "Access-Control-Request-Headers"
+
+const allow_headers_header = "Access-Control-Allow-Headers"
+
 fn parse_config(
   allowed_origins: List(String),
   allowed_methods: List(Method),
+  allowed_headers: List(String),
 ) -> Result(Config, Nil) {
   try allowed_origins = parse_allowed_origins(allowed_origins)
   try allowed_methods = parse_allowed_methods(allowed_methods)
-  Config(allowed_origins, allowed_methods)
+  try allowed_headers = parse_allowed_headers(allowed_headers)
+  Config(allowed_origins, allowed_methods, allowed_headers)
   |> Ok
 }
 
@@ -62,14 +76,23 @@ fn parse_allowed_methods(l: List(Method)) -> Result(AllowedMethods, Nil) {
   }
 }
 
+fn parse_allowed_headers(l: List(String)) -> Result(AllowedHeaders, Nil) {
+  let headers_set = set.from_list(l)
+  case set.size(headers_set) {
+    0 -> Error(Nil)
+    _ -> Ok(headers_set)
+  }
+}
+
 type Response =
   response.Response(BitBuilder)
 
 pub fn middleware(
   allowed_origins: List(String),
   allowed_methods: List(Method),
+  allowed_headers: List(String),
 ) -> Middleware(a, BitBuilder, a, BitBuilder) {
-  case parse_config(allowed_origins, allowed_methods) {
+  case parse_config(allowed_origins, allowed_methods, allowed_headers) {
     Ok(config) -> middleware_from_config(config)
     Error(_) -> function.identity
   }
@@ -97,15 +120,24 @@ fn handler(request: Request(a), config: Config) -> Response {
     request.get_header(request, "origin")
     |> result.unwrap("")
 
+  let access_control_request_headers =
+    request.get_header(request, request_headers_header)
+    |> result.map(string.split(_, ", "))
+    |> result.unwrap([])
+
   let is_request_allowed =
     is_origin_allowed(origin, config.allowed_origins) && is_method_allowed(
       request.method,
       config.allowed_methods,
+    ) && are_headers_allowed(
+      access_control_request_headers,
+      config.allowed_headers,
     )
   case is_request_allowed {
     True ->
       response
       |> prepend_allow_origin_header(origin, config.allowed_origins)
+      |> prepend_allow_headers_header(access_control_request_headers)
     False -> response
   }
 }
@@ -119,6 +151,16 @@ fn is_origin_allowed(origin: String, allowed_origins: AllowedOrigins) -> Bool {
 
 fn is_method_allowed(method: Method, allowed_methods: AllowedMethods) -> Bool {
   set.contains(allowed_methods, method)
+}
+
+fn are_headers_allowed(
+  request_headers: List(String),
+  allowed_headers: AllowedHeaders,
+) -> Bool {
+  list.all(
+    request_headers,
+    fn(header) { set.contains(allowed_headers, header) },
+  )
 }
 
 fn prepend_allow_origin_header(
@@ -135,4 +177,12 @@ fn prepend_allow_origin_header(
       |> response.prepend_header(allow_origin_header, origin)
       |> response.prepend_header("Vary", "Origin")
   }
+}
+
+fn prepend_allow_headers_header(
+  response: Response,
+  headers: List(String),
+) -> Response {
+  string.join(headers, ", ")
+  |> response.prepend_header(response, allow_headers_header, _)
 }
