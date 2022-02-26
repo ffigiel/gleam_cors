@@ -109,21 +109,21 @@ fn middleware_from_config(
   fn(service) {
     fn(request: Request(a)) -> Response {
       case request.method {
-        Options -> handler(request, config)
-        _ -> service(request)
+        Options -> handle_options_request(request, config)
+        _ -> handle_other_request(service, request, config.allowed_origins)
       }
     }
   }
 }
 
-fn handler(request: Request(a), config: Config) -> Response {
+/// For OPTIONS requests, we must check if request origin, request method and request headers are
+/// allowed, and include CORS headers for allowed origin and allowed headers.
+fn handle_options_request(request: Request(a), config: Config) -> Response {
   let response =
     response.new(200)
     |> response.set_body(bit_builder.new())
 
-  let origin =
-    request.get_header(request, "origin")
-    |> result.unwrap("")
+  let origin = get_origin(request)
 
   let ac_request_method =
     request.get_header(request, request_method_header)
@@ -147,6 +147,27 @@ fn handler(request: Request(a), config: Config) -> Response {
       |> prepend_allow_headers_header(ac_request_headers)
     False -> response
   }
+}
+
+/// For other requests, if the request Origin header matches allowed origins, we must include the CORS header for allowed origin.
+fn handle_other_request(
+  service,
+  request: Request(a),
+  allowed_origins: AllowedOrigins,
+) -> Response {
+  let origin = get_origin(request)
+  let response = service(request)
+  case is_origin_allowed(origin, allowed_origins) {
+    True ->
+      response
+      |> prepend_allow_origin_header(origin, allowed_origins)
+    False -> response
+  }
+}
+
+fn get_origin(request: Request(a)) -> String {
+  request.get_header(request, "origin")
+  |> result.unwrap("")
 }
 
 fn is_origin_allowed(origin: String, allowed_origins: AllowedOrigins) -> Bool {
