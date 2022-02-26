@@ -1,5 +1,5 @@
 import gleam/io
-import gleam/http.{Options}
+import gleam/http.{Method, Options}
 import gleam/http/request.{Request}
 import gleam/http/response
 import gleam/http/service.{Middleware}
@@ -11,7 +11,7 @@ import gleam/io
 import gleam/function
 
 type Config {
-  Config(allowed_origins: AllowedOrigins)
+  Config(allowed_origins: AllowedOrigins, allowed_methods: AllowedMethods)
 }
 
 type AllowedOrigins {
@@ -19,13 +19,20 @@ type AllowedOrigins {
   AllowSome(Set(String))
 }
 
+type AllowedMethods =
+  Set(Method)
+
 const allow_origin_header = "Access-Control-Allow-Origin"
 
 const allow_all_origins = "*"
 
-fn parse_config(allowed_origins: List(String)) -> Result(Config, Nil) {
+fn parse_config(
+  allowed_origins: List(String),
+  allowed_methods: List(Method),
+) -> Result(Config, Nil) {
   try allowed_origins = parse_allowed_origins(allowed_origins)
-  Config(allowed_origins: allowed_origins)
+  try allowed_methods = parse_allowed_methods(allowed_methods)
+  Config(allowed_origins, allowed_methods)
   |> Ok
 }
 
@@ -41,9 +48,17 @@ fn parse_allowed_origins(l: List(String)) -> Result(AllowedOrigins, Nil) {
         0 -> Error(Nil)
         _ ->
           AllowSome(origins_set)
-          |> Ok()
+          |> Ok
       }
     }
+  }
+}
+
+fn parse_allowed_methods(l: List(Method)) -> Result(AllowedMethods, Nil) {
+  let methods_set = set.from_list(l)
+  case set.size(methods_set) {
+    0 -> Error(Nil)
+    _ -> Ok(methods_set)
   }
 }
 
@@ -52,8 +67,9 @@ type Response =
 
 pub fn middleware(
   allowed_origins: List(String),
+  allowed_methods: List(Method),
 ) -> Middleware(a, BitBuilder, a, BitBuilder) {
-  case parse_config(allowed_origins) {
+  case parse_config(allowed_origins, allowed_methods) {
     Ok(config) -> middleware_from_config(config)
     Error(_) -> function.identity
   }
@@ -81,7 +97,12 @@ fn handler(request: Request(a), config: Config) -> Response {
     request.get_header(request, "origin")
     |> result.unwrap("")
 
-  case is_origin_allowed(origin, config.allowed_origins) {
+  let is_request_allowed =
+    is_origin_allowed(origin, config.allowed_origins) && is_method_allowed(
+      request.method,
+      config.allowed_methods,
+    )
+  case is_request_allowed {
     True ->
       response
       |> prepend_allow_origin_header(origin, config.allowed_origins)
@@ -94,6 +115,10 @@ fn is_origin_allowed(origin: String, allowed_origins: AllowedOrigins) -> Bool {
     AllowAll -> True
     AllowSome(origins) -> set.contains(origins, origin)
   }
+}
+
+fn is_method_allowed(method: Method, allowed_methods: AllowedMethods) -> Bool {
+  set.contains(allowed_methods, method)
 }
 
 fn prepend_allow_origin_header(
