@@ -83,10 +83,7 @@ fn parse_allowed_headers(l: List(String)) -> Result(AllowedHeaders, Nil) {
     l
     |> list.map(string.lowercase)
     |> set.from_list
-  case set.size(headers_set) {
-    0 -> Error(Nil)
-    _ -> Ok(headers_set)
-  }
+  Ok(headers_set)
 }
 
 type Response =
