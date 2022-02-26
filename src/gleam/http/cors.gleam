@@ -91,5 +91,6 @@ fn prepend_allow_origin_header(
     AllowSome(_) ->
       response
       |> response.prepend_header(allow_origin_header, origin)
+      |> response.prepend_header("Vary", "Origin")
   }
 }
