@@ -185,6 +185,10 @@ fn prepend_allow_headers_header(
   response: Response,
   headers: List(String),
 ) -> Response {
-  string.join(headers, ", ")
-  |> response.prepend_header(response, allow_headers_header, _)
+  case list.length(headers) {
+    0 -> response
+    _ ->
+      string.join(headers, ", ")
+      |> response.prepend_header(response, allow_headers_header, _)
+  }
 }
