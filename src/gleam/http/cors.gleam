@@ -1,4 +1,3 @@
-import gleam/io
 import gleam/http.{Method, Options}
 import gleam/http/request.{Request}
 import gleam/http/response
@@ -7,7 +6,6 @@ import gleam/bit_builder.{BitBuilder}
 import gleam/result
 import gleam/list
 import gleam/set.{Set}
-import gleam/io
 import gleam/function
 import gleam/string
 
@@ -33,6 +31,8 @@ type AllowedHeaders =
 const allow_origin_header = "Access-Control-Allow-Origin"
 
 const allow_all_origins = "*"
+
+const request_method_header = "Access-Control-Request-Method"
 
 const request_headers_header = "Access-Control-Request-Headers"
 
@@ -120,24 +120,26 @@ fn handler(request: Request(a), config: Config) -> Response {
     request.get_header(request, "origin")
     |> result.unwrap("")
 
-  let access_control_request_headers =
+  let ac_request_method =
+    request.get_header(request, request_method_header)
+    |> result.then(http.parse_method)
+    |> result.unwrap(http.Other(""))
+
+  let ac_request_headers =
     request.get_header(request, request_headers_header)
     |> result.map(string.split(_, ", "))
     |> result.unwrap([])
 
   let is_request_allowed =
     is_origin_allowed(origin, config.allowed_origins) && is_method_allowed(
-      request.method,
+      ac_request_method,
       config.allowed_methods,
-    ) && are_headers_allowed(
-      access_control_request_headers,
-      config.allowed_headers,
-    )
+    ) && are_headers_allowed(ac_request_headers, config.allowed_headers)
   case is_request_allowed {
     True ->
       response
       |> prepend_allow_origin_header(origin, config.allowed_origins)
-      |> prepend_allow_headers_header(access_control_request_headers)
+      |> prepend_allow_headers_header(ac_request_headers)
     False -> response
   }
 }
