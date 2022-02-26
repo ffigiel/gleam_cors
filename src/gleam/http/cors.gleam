@@ -8,13 +8,13 @@ import gleam/result
 import gleam/list
 import gleam/set.{Set}
 import gleam/io
+import gleam/function
 
 type Config {
   Config(allowed_origins: AllowedOrigins)
 }
 
 type AllowedOrigins {
-  AllowNone
   AllowAll
   AllowSome(Set(String))
 }
@@ -23,17 +23,28 @@ const allow_origin_header = "Access-Control-Allow-Origin"
 
 const allow_all_origins = "*"
 
-fn new_config(allowed_origins: List(String)) -> Config {
-  let allowed_origins = case list.contains(allowed_origins, allow_all_origins), allowed_origins {
-    True, _ -> AllowAll
-    _, [] -> AllowNone
-    _, other ->
-      set.from_list(other)
-      // `handler` relies on "" not being in the set, "" is not a valid origin anyway
-      |> set.delete("")
-      |> AllowSome
-  }
+fn parse_config(allowed_origins: List(String)) -> Result(Config, Nil) {
+  try allowed_origins = parse_allowed_origins(allowed_origins)
   Config(allowed_origins: allowed_origins)
+  |> Ok
+}
+
+fn parse_allowed_origins(l: List(String)) -> Result(AllowedOrigins, Nil) {
+  case list.contains(l, allow_all_origins), l {
+    True, _ -> Ok(AllowAll)
+    _, other -> {
+      let origins_set =
+        set.from_list(other)
+        // `handler` relies on "" not being in the set, "" is not a valid origin anyway
+        |> set.delete("")
+      case set.size(origins_set) {
+        0 -> Error(Nil)
+        _ ->
+          AllowSome(origins_set)
+          |> Ok()
+      }
+    }
+  }
 }
 
 type Response =
@@ -42,7 +53,15 @@ type Response =
 pub fn middleware(
   allowed_origins: List(String),
 ) -> Middleware(a, BitBuilder, a, BitBuilder) {
-  let config = new_config(allowed_origins)
+  case parse_config(allowed_origins) {
+    Ok(config) -> middleware_from_config(config)
+    Error(_) -> function.identity
+  }
+}
+
+fn middleware_from_config(
+  config: Config,
+) -> Middleware(a, BitBuilder, a, BitBuilder) {
   fn(service) {
     fn(request: Request(a)) -> Response {
       case request.method {
@@ -72,7 +91,6 @@ fn handler(request: Request(a), config: Config) -> Response {
 
 fn is_origin_allowed(origin: String, allowed_origins: AllowedOrigins) -> Bool {
   case allowed_origins {
-    AllowNone -> False
     AllowAll -> True
     AllowSome(origins) -> set.contains(origins, origin)
   }
@@ -84,7 +102,6 @@ fn prepend_allow_origin_header(
   allowed_origins: AllowedOrigins,
 ) -> Response {
   case allowed_origins {
-    AllowNone -> response
     AllowAll ->
       response
       |> response.prepend_header(allow_origin_header, allow_all_origins)
