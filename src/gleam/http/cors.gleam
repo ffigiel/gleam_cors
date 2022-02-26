@@ -88,9 +88,9 @@ type Response =
   response.Response(BitBuilder)
 
 pub fn middleware(
-  allowed_origins: List(String),
-  allowed_methods: List(Method),
-  allowed_headers: List(String),
+  origins allowed_origins: List(String),
+  methods allowed_methods: List(Method),
+  headers allowed_headers: List(String),
 ) -> Middleware(a, BitBuilder, a, BitBuilder) {
   case parse_config(allowed_origins, allowed_methods, allowed_headers) {
     Ok(config) -> middleware_from_config(config)
