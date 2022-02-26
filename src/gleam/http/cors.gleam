@@ -92,6 +92,16 @@ fn parse_allowed_headers(l: List(String)) -> Result(AllowedHeaders, Nil) {
 type Response =
   response.Response(BitBuilder)
 
+/// A middleware that adds CORS headers to responses based on the given configuration.
+///
+/// ## Examples
+///
+///    service
+///    |> cors.middleware(
+///      origins: ["https://staging.example.com", "http://localhost:8000"],
+///      methods: [Get, Post, Delete],
+///      headers: ["Authorization", "Content-Type"],
+///    )
 pub fn middleware(
   origins allowed_origins: List(String),
   methods allowed_methods: List(Method),
