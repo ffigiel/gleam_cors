@@ -35,4 +35,4 @@ placed early in your middleware stack (late in the pipeline).
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md)
+See [CHANGELOG.md](CHANGELOG.md) in the project repository
