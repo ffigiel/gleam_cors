@@ -3,7 +3,7 @@
 [![Package Version](https://img.shields.io/hexpm/v/gleam_cors)](https://hex.pm/packages/gleam_cors)
 [![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/gleam_cors/)
 
-A CORS middleware for Gleam.
+Unofficial CORS middleware for the [`gleam_http`](https://hexdocs.pm/gleam_http/index.html) library.
 
 ## Installation
 
