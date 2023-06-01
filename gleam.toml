@@ -6,8 +6,8 @@ description = "A CORS middleware for Gleam"
 repository = { type = "github", user = "megapctr", repo = "gleam_cors" }
 
 [dependencies]
-gleam_stdlib = "~> 0.20"
-gleam_http = "~> 3.0"
+gleam_stdlib = "~> 0.29"
+gleam_http = "~> 3.2"
 
 [dev-dependencies]
-gleeunit = "~> 0.6"
+gleeunit = "~> 0.10"

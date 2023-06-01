@@ -3,7 +3,7 @@ import gleam/http/request.{Request}
 import gleam/http/response
 import gleam/http/service.{Middleware}
 import gleam/bit_builder.{BitBuilder}
-import gleam/result
+import gleam/result.{try}
 import gleam/list
 import gleam/set.{Set}
 import gleam/function
@@ -43,9 +43,9 @@ fn parse_config(
   allowed_methods: List(Method),
   allowed_headers: List(String),
 ) -> Result(Config, Nil) {
-  try allowed_origins = parse_allowed_origins(allowed_origins)
-  try allowed_methods = parse_allowed_methods(allowed_methods)
-  try allowed_headers = parse_allowed_headers(allowed_headers)
+  use allowed_origins <- try(parse_allowed_origins(allowed_origins))
+  use allowed_methods <- try(parse_allowed_methods(allowed_methods))
+  use allowed_headers <- try(parse_allowed_headers(allowed_headers))
   Config(allowed_origins, allowed_methods, allowed_headers)
   |> Ok
 }
