@@ -14,6 +14,7 @@ type Config {
     allowed_origins: AllowedOrigins,
     allowed_methods: AllowedMethods,
     allowed_headers: AllowedHeaders,
+    allow_credentials: Bool,
   )
 }
 
@@ -38,15 +39,18 @@ const request_headers_header = "Access-Control-Request-Headers"
 
 const allow_headers_header = "Access-Control-Allow-Headers"
 
+const allow_credentials_header = "Access-Control-Allow-Credentials"
+
 fn parse_config(
   allowed_origins: List(String),
   allowed_methods: List(Method),
   allowed_headers: List(String),
+  allow_credentials: Bool,
 ) -> Result(Config, Nil) {
   use allowed_origins <- try(parse_allowed_origins(allowed_origins))
   use allowed_methods <- try(parse_allowed_methods(allowed_methods))
   use allowed_headers <- try(parse_allowed_headers(allowed_headers))
-  Config(allowed_origins, allowed_methods, allowed_headers)
+  Config(allowed_origins, allowed_methods, allowed_headers, allow_credentials)
   |> Ok
 }
 
@@ -58,7 +62,7 @@ fn parse_allowed_origins(l: List(String)) -> Result(AllowedOrigins, Nil) {
         origins
         |> list.map(string.lowercase)
         |> set.from_list
-        // `handler` relies on "" not being in the set, "" is not a valid origin anyway
+        // Keeping an empty string would lead to accepting requests with invalid/missing Origin header
         |> set.delete("")
       case set.size(origins_set) {
         0 -> Error(Nil)
@@ -103,8 +107,16 @@ pub fn middleware(
   origins allowed_origins: List(String),
   methods allowed_methods: List(Method),
   headers allowed_headers: List(String),
+  credentials allow_credentials: Bool,
 ) -> Middleware(a, BitBuilder, a, BitBuilder) {
-  case parse_config(allowed_origins, allowed_methods, allowed_headers) {
+  case
+    parse_config(
+      allowed_origins,
+      allowed_methods,
+      allowed_headers,
+      allow_credentials,
+    )
+  {
     Ok(config) -> middleware_from_config(config)
     Error(_) -> function.identity
   }
@@ -117,7 +129,7 @@ fn middleware_from_config(
     fn(request: Request(a)) -> Response {
       case request.method {
         Options -> handle_options_request(request, config)
-        _ -> handle_other_request(service, request, config.allowed_origins)
+        _ -> handle_other_request(service, request, config)
       }
     }
   }
@@ -160,14 +172,15 @@ fn handle_options_request(request: Request(a), config: Config) -> Response {
 fn handle_other_request(
   service,
   request: Request(a),
-  allowed_origins: AllowedOrigins,
+  config: Config,
 ) -> Response {
   let origin = get_origin(request)
   let response = service(request)
-  case is_origin_allowed(origin, allowed_origins) {
+  case is_origin_allowed(origin, config.allowed_origins) {
     True ->
       response
-      |> prepend_allow_origin_header(origin, allowed_origins)
+      |> prepend_allow_origin_header(origin, config.allowed_origins)
+      |> prepend_allow_credentials_header(config.allow_credentials)
     False -> response
   }
 }
@@ -223,5 +236,17 @@ fn prepend_allow_headers_header(
     _ ->
       string.join(headers, ", ")
       |> response.prepend_header(response, allow_headers_header, _)
+  }
+}
+
+fn prepend_allow_credentials_header(
+  response: Response,
+  allow_credentials: Bool,
+) -> Response {
+  case allow_credentials {
+    False -> response
+    True ->
+      response
+      |> response.prepend_header(allow_credentials_header, "true")
   }
 }

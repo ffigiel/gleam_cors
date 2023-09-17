@@ -23,6 +23,7 @@ pub fn allowed_origins_test() {
       origins: ["https://example.com", "http://example.com"],
       methods: [Post],
       headers: [],
+      credentials: False,
     )
   let test_origin = fn(request, should_allow, origin) {
     let result =
@@ -59,7 +60,12 @@ pub fn allowed_methods_test() {
   let origin = "https://example.com"
   let handler =
     service
-    |> cors.middleware(origins: [origin], methods: [Post, Delete], headers: [])
+    |> cors.middleware(
+      origins: [origin],
+      methods: [Post, Delete],
+      headers: [],
+      credentials: False,
+    )
   let test_method = fn(request, should_allow) {
     let result =
       request
@@ -93,6 +99,7 @@ pub fn allowed_headers_test() {
       origins: [origin],
       methods: [Post],
       headers: ["Authorization", "Content-Type", "X-Request-Id"],
+      credentials: False,
     )
   let test_headers = fn(request, should_allow) {
     let result =
@@ -117,4 +124,28 @@ pub fn allowed_headers_test() {
   test_headers(with_cors_headers(req, "X-Request-Id, Whatever"), False)
   // allow if no cors headers are declared
   test_headers(req, True)
+}
+
+pub fn allow_credentials_test() {
+  [True, False]
+  |> list.each(fn(should_allow_credentials) {
+    let handler =
+      service
+      |> cors.middleware(
+        origins: ["https://example.com"],
+        methods: [Post],
+        headers: [],
+        credentials: should_allow_credentials,
+      )
+    let header_value =
+      request.new()
+      |> request.set_method(Post)
+      |> request.prepend_header("Origin", "https://example.com")
+      |> handler
+      |> response.get_header("Access-Control-Allow-Credentials")
+    case should_allow_credentials {
+      True -> should.equal(header_value, Ok("true"))
+      False -> should.equal(header_value, Error(Nil))
+    }
+  })
 }
