@@ -1,11 +1,11 @@
-import gleam/http.{Method, Options}
-import gleam/http/request.{Request}
+import gleam/http.{type Method, Options}
+import gleam/http/request.{type Request}
 import gleam/http/response
-import gleam/http/service.{Middleware}
-import gleam/bit_builder.{BitBuilder}
+import gleam/http/service.{type Middleware}
+import gleam/bytes_builder.{type BytesBuilder}
 import gleam/result.{try}
 import gleam/list
-import gleam/set.{Set}
+import gleam/set.{type Set}
 import gleam/function
 import gleam/string
 
@@ -91,7 +91,7 @@ fn parse_allowed_headers(l: List(String)) -> Result(AllowedHeaders, Nil) {
 }
 
 type Response =
-  response.Response(BitBuilder)
+  response.Response(BytesBuilder)
 
 /// A middleware that adds CORS headers to responses based on the given configuration.
 ///
@@ -108,7 +108,7 @@ pub fn middleware(
   methods allowed_methods: List(Method),
   headers allowed_headers: List(String),
   credentials allow_credentials: Bool,
-) -> Middleware(a, BitBuilder, a, BitBuilder) {
+) -> Middleware(a, BytesBuilder, a, BytesBuilder) {
   case
     parse_config(
       allowed_origins,
@@ -124,7 +124,7 @@ pub fn middleware(
 
 fn middleware_from_config(
   config: Config,
-) -> Middleware(a, BitBuilder, a, BitBuilder) {
+) -> Middleware(a, BytesBuilder, a, BytesBuilder) {
   fn(service) {
     fn(request: Request(a)) -> Response {
       case request.method {
@@ -140,7 +140,7 @@ fn middleware_from_config(
 fn handle_options_request(request: Request(a), config: Config) -> Response {
   let response =
     response.new(200)
-    |> response.set_body(bit_builder.new())
+    |> response.set_body(bytes_builder.new())
 
   let origin = get_origin(request)
 
@@ -155,10 +155,9 @@ fn handle_options_request(request: Request(a), config: Config) -> Response {
     |> result.unwrap([])
 
   let is_request_allowed =
-    is_origin_allowed(origin, config.allowed_origins) && is_method_allowed(
-      ac_request_method,
-      config.allowed_methods,
-    ) && are_headers_allowed(ac_request_headers, config.allowed_headers)
+    is_origin_allowed(origin, config.allowed_origins)
+    && is_method_allowed(ac_request_method, config.allowed_methods)
+    && are_headers_allowed(ac_request_headers, config.allowed_headers)
   case is_request_allowed {
     True ->
       response
@@ -205,10 +204,9 @@ fn are_headers_allowed(
   request_headers: List(String),
   allowed_headers: AllowedHeaders,
 ) -> Bool {
-  list.all(
-    request_headers,
-    fn(header) { set.contains(allowed_headers, string.lowercase(header)) },
-  )
+  list.all(request_headers, fn(header) {
+    set.contains(allowed_headers, string.lowercase(header))
+  })
 }
 
 fn prepend_allow_origin_header(

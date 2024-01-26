@@ -1,7 +1,7 @@
 import gleeunit
-import gleam/bit_builder.{BitBuilder}
+import gleam/bytes_builder.{type BytesBuilder}
 import gleam/list
-import gleam/http/response.{Response}
+import gleam/http/response.{type Response}
 import gleam/http/request
 import gleeunit/should
 import gleam/http.{Delete, Options, Post}
@@ -11,9 +11,9 @@ pub fn main() {
   gleeunit.main()
 }
 
-fn service(_) -> Response(BitBuilder) {
+fn service(_) -> Response(BytesBuilder) {
   response.new(200)
-  |> response.set_body(bit_builder.new())
+  |> response.set_body(bytes_builder.new())
 }
 
 pub fn allowed_origins_test() {
