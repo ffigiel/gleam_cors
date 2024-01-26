@@ -94,6 +94,10 @@ type Response =
   response.Response(BytesBuilder)
 
 /// A middleware that adds CORS headers to responses based on the given configuration.
+/// origins: List of allowed request origins.
+/// methods: List of allowed request HTTP methods.
+/// headers: List of allowed request headers.
+/// credentials: If True, sets the `Access-Control-Allow-Credentials: true` response header.
 ///
 /// ## Examples
 ///
@@ -102,6 +106,7 @@ type Response =
 ///      origins: ["https://staging.example.com", "http://localhost:8000"],
 ///      methods: [Get, Post, Delete],
 ///      headers: ["Authorization", "Content-Type"],
+///      credentials: True,
 ///    )
 pub fn middleware(
   origins allowed_origins: List(String),
